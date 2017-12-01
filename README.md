@@ -67,12 +67,14 @@ See below for available options.
 `--show`: Specifies whether the image should be shown on screen,
 in addition to being generated.
 
-`--list-families`: Show a list of available font families and quit.
+`--families`: Print a list of available font families and quit.
 
-`--list-font-names`: Show a list of available font names and quit.
+`--names`: Print a list of available font names and quit.
 
-`--list-font-names-in-family FAMILY`: Show a list of available font names
+`--names-in FAMILY`: Print a list of available font names
 that belongs to the specified font family and quit.
+
+`--help`: Print help text.
 
 ### Colors
 
