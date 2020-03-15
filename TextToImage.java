@@ -21,7 +21,6 @@ import javafx.scene.text.TextAlignment;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
-import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javax.imageio.ImageIO;
 
@@ -163,75 +162,89 @@ public final class TextToImage extends Application {
     }
 
     private static final boolean parseArgs(final String... args) {
+        boolean isOptionsEnded = false;
         for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-            case "-t":
-            case "--text":
-                text = args[++i];
-                break;
-            case "-n":
-            case "--name":
-                name = args[++i];
-                isNameUsed = true;
-                break;
-            case "-f":
-            case "--family":
-                family = args[++i];
-                isNameUsed = false;
-                break;
-            case "-w":
-            case "--weight":
-                weight = FontWeight.valueOf(args[++i].toUpperCase(Locale.ROOT));
-                break;
-            case "--bold":
-                weight = FontWeight.BOLD;
-                break;
-            case "-p":
-            case "--posture":
-                posture = FontPosture.valueOf(args[++i].toUpperCase(Locale.ROOT));
-                break;
-            case "--italic":
-                posture = FontPosture.ITALIC;
-                break;
-            case "-s":
-            case "--size":
-                size = Double.valueOf(args[++i]);
-                break;
-            case "--fgColor":
-                foregroundColor = Color.valueOf(args[++i]);
-                break;
-            case "--bgColor":
-                backgroundColor = Color.valueOf(args[++i]);
-                break;
-            case "--underline":
-                isUnderline = true;
-                break;
-            case "-o":
-            case "--output":
-                output = args[++i];
-                int index;
-                if ((index = output.lastIndexOf('.')) == -1) {
-                    throw new RuntimeException("Unknown output file format");
+            if (!isOptionsEnded) {
+                switch (args[i]) {
+                case "-t":
+                case "--text":
+                    text = args[++i];
+                    break;
+                case "-n":
+                case "--name":
+                    name = args[++i];
+                    isNameUsed = true;
+                    break;
+                case "-f":
+                case "--family":
+                    family = args[++i];
+                    isNameUsed = false;
+                    break;
+                case "-w":
+                case "--weight":
+                    weight = FontWeight.valueOf(args[++i].toUpperCase(Locale.ROOT));
+                    break;
+                case "--bold":
+                    weight = FontWeight.BOLD;
+                    break;
+                case "-p":
+                case "--posture":
+                    posture = FontPosture.valueOf(args[++i].toUpperCase(Locale.ROOT));
+                    break;
+                case "--italic":
+                    posture = FontPosture.ITALIC;
+                    break;
+                case "-s":
+                case "--size":
+                    size = Double.valueOf(args[++i]);
+                    break;
+                case "--fgColor":
+                    foregroundColor = Color.valueOf(args[++i]);
+                    break;
+                case "--bgColor":
+                    backgroundColor = Color.valueOf(args[++i]);
+                    break;
+                case "--underline":
+                    isUnderline = true;
+                    break;
+                case "-o":
+                case "--output":
+                    output = args[++i];
+                    int index;
+                    if ((index = output.lastIndexOf('.')) == -1) {
+                        throw new RuntimeException("Unknown output file format");
+                    }
+                    formatName = output.substring(index + 1);
+                    break;
+                case "--show":
+                    isShown = true;
+                    break;
+                case "--families":
+                    showFamiles();
+                    return false;
+                case "--names":
+                    showFontNames();
+                    return false;
+                case "--names-in":
+                    family = args[++i];
+                    showFontNamesInFamily(family);
+                    return false;
+                case "--names-hierarchy":
+                    showFontNamesHierarchy();
+                    return false;
+                case "--help":
+                    showHelp();
+                    return false;
+                default:
+                    if ("--".equals(args[i])) {
+                        isOptionsEnded = true;
+                    } else if (args[i].startsWith("--")) {
+                        System.out.println("Unknown option: " + args[i]);
+                        return false;
+                    }
+                    text = args[i];
                 }
-                formatName = output.substring(index + 1);
-                break;
-            case "--show":
-                isShown = true;
-                break;
-            case "--families":
-                showFamiles();
-                return false;
-            case "--names":
-                showFontNames();
-                return false;
-            case "--names-in":
-                family = args[++i];
-                showFontNamesInFamily(family);
-                return false;
-            case "--help":
-                showHelp();
-                return false;
-            default:
+            } else {
                 text = args[i];
             }
         }
@@ -253,6 +266,15 @@ public final class TextToImage extends Application {
     private static final void showFontNamesInFamily(final String family) {
         for (final String fontName : Font.getFontNames(family)) {
             System.out.println(fontName);
+        }
+    }
+
+    private static final void showFontNamesHierarchy() {
+        for (final String family : Font.getFamilies()) {
+            System.out.println(family);
+            for (final String fontName : Font.getFontNames(family)) {
+                System.out.println("\t" + fontName);
+            }
         }
     }
 
