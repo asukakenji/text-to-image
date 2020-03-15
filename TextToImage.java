@@ -29,8 +29,10 @@ public final class TextToImage extends Application {
 
     // Font Related
     private static boolean isNameUsed = false;
-    private static String name = "System Regular";
-    private static String family = "System";
+    private static final String DEFAULT_NAME = "System Regular";
+    private static String name = null;
+    private static final String DEFAULT_FAMILY = "System";
+    private static String family = null;
     private static FontWeight weight = FontWeight.NORMAL;
     private static FontPosture posture = FontPosture.REGULAR;
     private static double size = 13;
@@ -47,13 +49,64 @@ public final class TextToImage extends Application {
     private static String output = "out.png";
     private static String formatName = "png";
 
+    private static final int OKAY = 0x0;
+    private static final int ERROR = 0x1;
+    private static final int SHOW_FONT_FAMILIES = 0x10;
+    private static final int SHOW_FONT_NAMES = 0x20;
+    private static final int SHOW_FONT_HIERARCHY = SHOW_FONT_FAMILIES | SHOW_FONT_NAMES;
+    private static final int SHOW_FONT = 0xF0;
+    private static final int SHOW_WRITER_FILE_SUFFIXES = 0x100;
+    private static final int SHOW_WRITER_FORMAT_NAMES = 0x200;
+    private static final int SHOW_WRITER_MIME_TYPES = 0x400;
+    private static final int SHOW_WRITER = 0xF00;
+
     public static final void main(final String... args) {
-        if (!parseArgs(args)) {
+        int status = parseArgs(args);
+        if (status != OKAY) {
+            if ((status & ERROR) != 0) {
+                showHelp();
+            } else if ((status & SHOW_FONT) != 0) {
+                // FAMILIES | NAMES | family  | name | result
+                // ---------+-------+---------+------+-----------------------
+                // Set      | Unset | "?"     |      | showFontFamiles
+                // Unset    | Set   | == null | "?"  | showFontNames
+                // Unset    | Set   | != null | "?"  | showFontNamesInFamily
+                // Set      | Set   | "?"     | "?"  | showFontNamesHierarchy
+                if ((status & SHOW_FONT_HIERARCHY) == SHOW_FONT_HIERARCHY) {
+                    showFontNamesHierarchy();
+                } else if ((status & SHOW_FONT_FAMILIES) == SHOW_FONT_FAMILIES) {
+                    showFontFamiles();
+                } else if ((status & SHOW_FONT_NAMES) == SHOW_FONT_NAMES) {
+                    if (family == null) {
+                        showFontNames();
+                    } else {
+                        showFontNamesInFamily(family);
+                    }
+                } else {
+                    throw new RuntimeException("Bug found in SHOW_FONT");
+                }
+            } else if ((status & SHOW_WRITER) != 0) {
+                if ((status & SHOW_WRITER_FILE_SUFFIXES) == SHOW_WRITER_FILE_SUFFIXES) {
+                    showWriterFileSuffixes();
+                } else if ((status & SHOW_WRITER_FORMAT_NAMES) == SHOW_WRITER_FORMAT_NAMES) {
+                    showWriterFormatNames();
+                } else if ((status & SHOW_WRITER_MIME_TYPES) == SHOW_WRITER_MIME_TYPES) {
+                    showWriterMIMETypes();
+                } else {
+                    throw new RuntimeException("Bug found in SHOW_WRITER");
+                }
+            }
             Platform.exit(); // "return" alone is not enough to quit
             return;
         }
 
         // Setup Font
+        if (family == null) {
+            family = DEFAULT_FAMILY;
+        }
+        if (name == null) {
+            name = DEFAULT_NAME;
+        }
         if (isNameUsed) {
             font = new Font(name, size);
         } else {
@@ -61,21 +114,27 @@ public final class TextToImage extends Application {
         }
         System.out.printf("Font Used: %s\n", font.getName());
 
-        // Setup Label
-        label = setupLabel(font, text, isUnderline);
+        // Create Label
+        label = createLabel(font, text, isUnderline);
 
         if (isShown) {
             launch(args);
         } else {
+            // Create a java.util.concurrent.CountDownLatch.
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            // Create an AdvancedRunnable, which has a try block and a finally block.
+            final AdvancedRunnable runnable = new AdvancedRunnable(
+                () -> saveSceneToFile(new Scene(label), formatName, new File(output)),  // try
+                () -> latch.countDown() // finally
+            );
+
+            // Schdule the above runnable to be executed on the JavaFX Application Thread.
             // If saveSceneToFile is executed on the main thread, it throws:
             // java.lang.IllegalStateException: Not on FX application thread; currentThread = main
-            final CountDownLatch latch = new CountDownLatch(1);
-            final AdvancedRunnable runnable = new AdvancedRunnable(
-                () -> saveSceneToFile(new Scene(label), formatName, new File(output)),
-                () -> latch.countDown()
-            );
             Platform.runLater(runnable);
             try {
+                // Wait for the runnable to finish
                 latch.await();
                 final Exception exception = runnable.getException();
                 if (exception != null) {
@@ -114,7 +173,7 @@ public final class TextToImage extends Application {
         }
     }
 
-    private static final Label setupLabel(final Font font, final String text, final boolean isUnderline) {
+    private static final Label createLabel(final Font font, final String text, final boolean isUnderline) {
         final Label label = new Label();
         label.setAlignment(Pos.CENTER);
         label.setContentDisplay(ContentDisplay.TEXT_ONLY);
@@ -161,7 +220,8 @@ public final class TextToImage extends Application {
         saveSceneToFile(scene, formatName, new File(output));
     }
 
-    private static final boolean parseArgs(final String... args) {
+    private static final int parseArgs(final String... args) {
+        int status = 0;
         boolean isOptionsEnded = false;
         for (int i = 0; i < args.length; i++) {
             if (!isOptionsEnded) {
@@ -173,12 +233,22 @@ public final class TextToImage extends Application {
                 case "-n":
                 case "--name":
                     name = args[++i];
-                    isNameUsed = true;
+                    if ("?".equals(name)) {
+                        status |= SHOW_FONT_NAMES;
+                    } else {
+                        status &= ~SHOW_FONT_NAMES;
+                        isNameUsed = true;
+                    }
                     break;
                 case "-f":
                 case "--family":
                     family = args[++i];
-                    isNameUsed = false;
+                    if ("?".equals(family)) {
+                        status |= SHOW_FONT_FAMILIES;
+                    } else {
+                        status &= ~SHOW_FONT_FAMILIES;
+                        isNameUsed = false;
+                    }
                     break;
                 case "-w":
                 case "--weight":
@@ -220,27 +290,46 @@ public final class TextToImage extends Application {
                     isShown = true;
                     break;
                 case "--families":
-                    showFamiles();
-                    return false;
+                    family = "?";
+                    name = null;
+                    status |= SHOW_FONT_FAMILIES;
+                    status &= ~SHOW_FONT_NAMES;
+                    break;
                 case "--names":
-                    showFontNames();
-                    return false;
+                    family = null;
+                    name = "?";
+                    status &= ~SHOW_FONT_FAMILIES;
+                    status |= SHOW_FONT_NAMES;
+                    break;
                 case "--names-in":
                     family = args[++i];
-                    showFontNamesInFamily(family);
-                    return false;
+                    name = "?";
+                    status &= ~SHOW_FONT_FAMILIES;
+                    status |= SHOW_FONT_NAMES;
+                    break;
                 case "--names-hierarchy":
-                    showFontNamesHierarchy();
-                    return false;
+                    family = "?";
+                    name = "?";
+                    status |= SHOW_FONT_HIERARCHY;
+                    break;
+                case "--suffixes":
+                    status |= SHOW_WRITER_FILE_SUFFIXES;
+                    break;
+                case "--formats":
+                    status |= SHOW_WRITER_FORMAT_NAMES;
+                    break;
+                case "--types":
+                    status |= SHOW_WRITER_MIME_TYPES;
+                    break;
                 case "--help":
-                    showHelp();
-                    return false;
+                    status = ERROR;
+                    break;
                 default:
                     if ("--".equals(args[i])) {
                         isOptionsEnded = true;
                     } else if (args[i].startsWith("--")) {
                         System.out.println("Unknown option: " + args[i]);
-                        return false;
+                        return ERROR;
                     }
                     text = args[i];
                 }
@@ -248,33 +337,51 @@ public final class TextToImage extends Application {
                 text = args[i];
             }
         }
-        return true;
+        return status;
     }
 
-    private static final void showFamiles() {
+    private static final void showFontFamiles() {
         for (final String family : Font.getFamilies()) {
             System.out.println(family);
         }
     }
 
     private static final void showFontNames() {
-        for (final String fontName : Font.getFontNames()) {
-            System.out.println(fontName);
+        for (final String name : Font.getFontNames()) {
+            System.out.println(name);
         }
     }
 
     private static final void showFontNamesInFamily(final String family) {
-        for (final String fontName : Font.getFontNames(family)) {
-            System.out.println(fontName);
+        for (final String name : Font.getFontNames(family)) {
+            System.out.println(name);
         }
     }
 
     private static final void showFontNamesHierarchy() {
         for (final String family : Font.getFamilies()) {
             System.out.println(family);
-            for (final String fontName : Font.getFontNames(family)) {
-                System.out.println("\t" + fontName);
+            for (final String name : Font.getFontNames(family)) {
+                System.out.println("\t" + name);
             }
+        }
+    }
+
+    private static final void showWriterFileSuffixes() {
+        for (final String suffix : ImageIO.getWriterFileSuffixes()) {
+            System.out.println(suffix);
+        }
+    }
+
+    private static final void showWriterFormatNames() {
+        for (final String name : ImageIO.getWriterFormatNames()) {
+            System.out.println(name);
+        }
+    }
+
+    private static final void showWriterMIMETypes() {
+        for (final String type : ImageIO.getWriterMIMETypes()) {
+            System.out.println(type);
         }
     }
 
@@ -325,6 +432,8 @@ public final class TextToImage extends Application {
 "--names                Print a list of available font names and quit.",
 "--names-in FAMILY      Print a list of available font names",
 "                       that belongs to the specified font family and quit.",
+"--names-hierarchy      Print a hierarchy of available font names.",
+"                       Available font names are printed under font families.",
 "--help                 Print help text.",
 "",
 "Colors:",
@@ -337,7 +446,7 @@ public final class TextToImage extends Application {
 "- Web HSLA values like 'hsla(210,50%,40%,1.0)'",
 "",
 "For a full description, please visit:",
-"https://docs.oracle.com/javase/9/docs/api/javafx/scene/paint/Color.html",
+"https://docs.oracle.com/javase/8/javafx/api/javafx/scene/paint/Color.html",
 ""
     );
 

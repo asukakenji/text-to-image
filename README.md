@@ -74,6 +74,9 @@ in addition to being generated.
 `--names-in FAMILY`: Print a list of available font names
 that belongs to the specified font family and quit.
 
+`--names-hierarchy`: Print a hierarchy of available font names.
+Available font names are printed under font families.
+
 `--help`: Print help text.
 
 ### Colors
@@ -89,7 +92,7 @@ Colors could be specified by:
 
 For a full description, please visit:
 
-https://docs.oracle.com/javase/9/docs/api/javafx/scene/paint/Color.html
+https://docs.oracle.com/javase/8/javafx/api/javafx/scene/paint/Color.html
 
 ## References
 
